@@ -1,9 +1,11 @@
+from operator import imatmul
 from PIL.Image import new
 import cv2
 from time import time
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from numpy.lib.function_base import gradient
 
 
 def convolve2D(image, kernel, padding=2, strides=1):
@@ -103,36 +105,66 @@ def generate_gaussian(size, sigma=1):
     result = np.exp(-((x**2 + y**2) / (2.0*sigma**2))) * normal
     return result
 
+def generate_sobel(direction):
+    if direction.lower() == 'x':
+        return np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
+    elif direction.lower() == 'y':
+        return np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], np.float32)
 
-def canny(img,kernel):
+def RGB2GRAY(image):
+    # RGB weight: L = R * 299/1000 + G * 587/1000 + B * 114/1000
+    rgb_weights = [0.2989, 0.587, 0.114]
+    result = np.dot(image[...,:3], rgb_weights) # normalize the grayimage to 0.0 to 1.0 to display
+    result = result.astype(np.uint8)
+    return result
+
+def sobel_dege_detector(image):
+    x_kernel = generate_sobel('x')
+    y_kernel = generate_sobel('y')
+    Ix = convolution (image, x_kernel)
+    Iy = convolution (image, y_kernel)
+    gradient_magnitude = np.sqrt(np.square(Ix) + np.square(Iy))
+    gradient_direction = np.arctan2(Iy, Ix)
+    return gradient_direction, gradient_magnitude
+
+def gaussian_blur(image):
+    kernel = generate_gaussian(size=5)
+    result = convolution(image, kernel)
+    return result
+
+def nms(image):
+    result = image
+    return result
+
+def canny(image):
     # 5 steps
     # 1.Noise reduction (guassian blur)
-    # img_gaussian = convolution(img, kernel_gaussian)
-    img_gaussian = convolution(img, kernel)
+    img_gaussian = gaussian_blur(image)
     cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
     
     # 2.edge enhancement (gradient caluclation)
-    
-    cv2.imshow('edge enhancement',img_enhance)
-    result = img_enhance
-    # 3.Non-maximum suppression;
+    gradient_direction, gradient_magnitude = sobel_dege_detector(img_gaussian)
+    cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
 
-    # 4.Double threshold;
+    # 3.Non-maximum suppression
+    img_nms = nms()
+    cv2.imshow('NMS', img_nms.astype(np.uint8))
 
-    # 5.Edge Tracking by Hysteresis.
-    return result
+    # 4.Double threshold
 
-def read():
+
+    # 5.Edge Tracking by Hysteresis
+
+    return None
+
+def read_image():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     image_ext = '.png'
     image_name = 'lena'
     image_path = os.path.join(base_dir, image_name + image_ext)
     image = cv2.imread(image_path)
     if len(image.shape) == 3:
-        # RGB weight: L = R * 299/1000 + G * 587/1000 + B * 114/1000
-        rgb_weights = [0.2989, 0.587, 0.114]
-        gray_image = np.dot(image[...,:3], rgb_weights) # normalize the grayimage to 0.0 to 1.0 to display
-        gray_image = gray_image.astype(np.uint8)
+        gray_image = RGB2GRAY(image)
     elif len(image.shape) == 2:
         gray_image = image
 
@@ -151,7 +183,7 @@ def read():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def main():
+def realtime():
     camera = cv2.VideoCapture(0)
     kernel_gauss = generate_gaussian(5)
     while True:
@@ -172,7 +204,7 @@ def main():
             break
 
 if __name__ == '__main__':
-    read()
+    read_image()
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)
