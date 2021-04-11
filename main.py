@@ -118,23 +118,151 @@ def RGB2GRAY(image):
     result = result.astype(np.uint8)
     return result
 
-def sobel_dege_detector(image):
-    x_kernel = generate_sobel('x')
-    y_kernel = generate_sobel('y')
-    Ix = convolution (image, x_kernel)
-    Iy = convolution (image, y_kernel)
-    gradient_magnitude = np.sqrt(np.square(Ix) + np.square(Iy))
-    gradient_direction = np.arctan2(Iy, Ix)
-    return gradient_direction, gradient_magnitude
-
 def gaussian_blur(image):
     kernel = generate_gaussian(size=5)
     result = convolution(image, kernel)
     return result
 
-def nms(image):
-    result = image
+def sobel_dege_detector(image):
+    x_kernel = generate_sobel('x')
+    y_kernel = generate_sobel('y')
+    Ix = convolution(image, x_kernel)
+    Iy = convolution(image, y_kernel)
+    gradient_magnitude = np.sqrt(np.square(Ix) + np.square(Iy))
+    gradient_direction = np.arctan2(Iy, Ix)
+    return gradient_direction, gradient_magnitude, Ix, Iy
+
+def nms(magnitude, dx, dy):
+    # use sub-pixel interpolation to determine the edge pixel
+    mag = np.copy(magnitude)
+    M, N = np.shape(mag)
+    result = np.zeros((M,N))
+
+    for i in range(1, M-1):
+        for j in range(1, N-1):
+            if mag[i, j] == 0:
+                result[i, j] =0
+            else:
+                gradX = dx[i,j]
+                gradY = dy[i,j]
+                gradX_abs = np.abs(gradX)
+                gradY_abs = np.abs(gradY)
+                grad = mag[i,j]
+
+                # Y gradient greater than X gradient
+                if gradY_abs > gradY_abs:
+                    if gradY == 0:
+                        weight = 0
+                    else:
+                        weight = gradX_abs / gradY_abs
+                    # |g1|g2|  |    |  |g2|g1|
+                    # |  | g|  | or |  | g|  |
+                    # |  |g4|g3|    |g3|g4|  |
+                    g2 = mag[i-1, j]
+                    g4 = mag[i+1, j]
+                    if gradX * gradY > 0:
+                        g1 = mag[i-1, j-1]
+                        g3 = mag[i+1, j+1]
+                    else:
+                        g1 = mag[i-1, j+1]
+                        g3 = mag[i+1, j-1]
+                # X gradient greater than Y gradient
+                else:
+                    if gradX == 0:
+                        weight = 0
+                    else:
+                        weight = gradY_abs / gradX_abs
+                    # |  |  |g3|    |g1|  |  |
+                    # |g2| g|g4| or |g2| g|g4|
+                    # |g1|  |  |    |  |  |g3|
+                    g2 = mag[i, j-1]
+                    g4 = mag[i, j+1]
+                    if gradX * gradY > 0:
+                        g1 = mag[i+1, j-1]
+                        g3 = mag[i-1, j+1]
+                    else:
+                        g1 = mag[i-1, j-1]
+                        g3 = mag[i+1, j+1]
+                
+                gradTemp1 = weight * g1 + (1-weight) * g2
+                gradTemp2 = weight * g3 + (1-weight) * g4
+                if grad >= gradTemp1 and grad >= gradTemp2:
+                    result[i,j] = grad
+                else:
+                    result[i,j] = 0
     return result
+
+def double_threshold(image, th_low_ratio = 0.1, th_high_ratio = 0.3):
+    # upper lower ratio is recommended to be between 2:1 or 3:1
+    highThreshold = np.max(image) * th_high_ratio
+    lowThreshold = np.max(image) * th_low_ratio
+    
+    M, N = image.shape
+    result = np.zeros((M,N), dtype=np.int32)
+    
+    weak_value = np.int32(50)
+    strong_value = np.int32(255)
+    
+    strong_i, strong_j = np.where(image >= highThreshold)
+    weak_i, weak_j = np.where((image <= highThreshold) & (image >= lowThreshold))
+    # zeros_i, zeros_j = np.where(image < lowThreshold)
+    
+    result[strong_i, strong_j] = strong_value
+    result[weak_i, weak_j] = weak_value
+
+    return (result, weak_value)
+
+def hysterisis(image, weak_value, strong_value=255):
+    M, N = image.shape
+    # result = np.zeros((M,N))
+    top2btm = np.copy(image)
+    right2left = np.copy(image)
+    left2right = np.copy(image)
+
+    # probably needs to go from other directions?
+    for i in range(1, M):
+        for j in range(1, N):
+            # check the 8 surroundings of the weak edge
+            if(top2btm[i,j]==weak_value):
+                if((top2btm[i-1, j-1:j+1] == strong_value).any()
+                     or (top2btm[i, [j-1,j+1]] == strong_value).any()
+                     or (top2btm[i+1, j-1:j+1] == strong_value).any()):
+                    top2btm[i,j] = strong_value
+                else:
+                    top2btm[i,j] = 0
+
+    for i in range(1, M):
+        for j in range(N-1, 0, -1):
+            if(right2left[i,j]==weak_value):
+                if((right2left[i-1, j-1:j+1] == strong_value).any()
+                    or (right2left[i, [j-1,j+1]] == strong_value).any()
+                    or (right2left[i+1, j-1:j+1] == strong_value).any()):
+                    right2left[i,j] = strong_value
+                else:
+                    right2left[i,j] = 0
+
+    for i in range(M-1, 0, -1):
+        for j in range(1, N):
+            if(left2right[i,j]==weak_value):
+                if((left2right[i-1, j-1:j+1] == strong_value).any()
+                    or (left2right[i, [j-1,j+1]] == strong_value).any()
+                    or (left2right[i+1, j-1:j+1] == strong_value).any()):
+                    left2right[i,j] = strong_value
+                else:
+                    left2right[i,j] = 0
+
+    result = top2btm + right2left + left2right
+    result[result > 255] = 255
+    return result
+
+def fit_parabola(x1, y1, x2, y2, x3, y3):
+    # y = ax^2+bx+c
+    denom = (x1-x2) * (x1-x3) * (x2-x3)
+    a = (x3 * (y2-y1) + x2 * (y1-y3) + x1 * (y3-y2)) / denom
+    b = (x3*x3 * (y1-y2) + x2*x2 * (y3-y1) + x1*x1 * (y2-y3)) / denom
+    c = (x2 * x3 * (x2-x3) * y1+x3 * x1 * (x3-x1) * y2+x1 * x2 * (x1-x2) * y3) / denom
+    x0 = (-1*b)/(2*a)
+    return x0
 
 def canny(image):
     # 5 steps
@@ -143,43 +271,45 @@ def canny(image):
     cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
     
     # 2.edge enhancement (gradient caluclation)
-    gradient_direction, gradient_magnitude = sobel_dege_detector(img_gaussian)
+    gradient_direction, gradient_magnitude, Ix, Iy = sobel_dege_detector(img_gaussian)
     cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
 
-    # 3.Non-maximum suppression
-    img_nms = nms()
-    cv2.imshow('NMS', img_nms.astype(np.uint8))
+    # 3.Non-maximum suppression (pixel accuracy)
+    img_nms = nms(gradient_magnitude,dx=Ix, dy=Iy)
+    cv2.imshow('NMS_result', img_nms.astype(np.uint8))
 
-    # 4.Double threshold
-
+    # 4.Double thresholding
+    img_dt, weak_value = double_threshold(img_nms)
+    cv2.imshow('double thresholding', img_dt.astype(np.uint8))
 
     # 5.Edge Tracking by Hysteresis
+    final_result = hysterisis(img_dt, weak_value=weak_value)
+    cv2.imshow('hysterisis', final_result.astype(np.uint8))
 
     return None
 
-def read_image():
+def read_image(image_name, image_ext):
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    image_ext = '.png'
-    image_name = 'lena'
-    image_path = os.path.join(base_dir, image_name + image_ext)
+    image_path = os.path.join(base_dir, image_name + '.' + image_ext)
     image = cv2.imread(image_path)
     if len(image.shape) == 3:
         gray_image = RGB2GRAY(image)
     elif len(image.shape) == 2:
         gray_image = image
 
-    # gray_image /= 255. # normalize the grayimage to 0.0 to 1.0 to display
+    # # normalize the grayimage to 0.0 to 1.0 for display
+    # gray_image /= 255. 
     # new_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # print(new_gray)
-    # print(gray_image) # opencv image is brighter, probabaly due to the low precision for fast computation speed
+    # # opencv image is brighter, probabaly due to the low precision for fast computation speed
+    # print(gray_image) 
 
     # CANNY
-    gaussian_kernel = generate_gaussian(size=5)
-    canny_image = canny(gray_image, gaussian_kernel)
+    canny_image = canny(gray_image)
 
     cv2.imshow('original', image)
     cv2.imshow('gray', gray_image)
-    cv2.imshow('canny', canny_image)
+    # cv2.imshow('canny', canny_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -204,7 +334,7 @@ def realtime():
             break
 
 if __name__ == '__main__':
-    read_image()
+    read_image('chessboard', 'jpg')
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
-    # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)
+    # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''
