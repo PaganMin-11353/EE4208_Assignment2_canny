@@ -6,6 +6,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import gradient
+import sys
 
 
 def convolve2D(image, kernel, padding=2, strides=1):
@@ -191,14 +192,8 @@ def nms(magnitude, dx, dy, sub_pixel=False):
                     result[i,j] = grad
                 else:
                     result[i,j] = 0
-                
-                if sub_pixel:
-                    true_x = fit_parabola(x1=,y1=gradTemp1,x2=,y2=grad,x3=,y3=gradTemp2)
-                    sub_pixel_location = np.append(sub_pixel_location, true_x)
-                else:
-                    sub_pixel_location = np.append(sub_pixel_location, 0)
 
-    return result, sub_pixel_location
+    return result
 
 def double_threshold(image, th_low_ratio = 0.1, th_high_ratio = 0.3):
     # upper lower ratio is recommended to be between 2:1 or 3:1
@@ -207,20 +202,41 @@ def double_threshold(image, th_low_ratio = 0.1, th_high_ratio = 0.3):
     
     M, N = image.shape
     result = np.zeros((M,N), dtype=np.int32)
+
+    strongedge_row = np.zeros(M*N)
+    strongedge_col = np.zeros(M*N)
+    weakedge_row = np.zeros(M*N)
+    weakedge_col = np.zeros(M*N)
+    strong_index = 0
+    weak_index = 0
     
     weak_value = np.int32(50)
     strong_value = np.int32(255)
     
-    strong_i, strong_j = np.where(image >= highThreshold)
-    weak_i, weak_j = np.where((image <= highThreshold) & (image >= lowThreshold))
+    # strong_i, strong_j = np.where(image >= highThreshold)
+    # weak_i, weak_j = np.where((image <= highThreshold) & (image >= lowThreshold))
     # zeros_i, zeros_j = np.where(image < lowThreshold)
-    
-    result[strong_i, strong_j] = strong_value
-    result[weak_i, weak_j] = weak_value
+    # result[strong_i, strong_j] = strong_value
+    # result[weak_i, weak_j] = weak_value
 
-    return (result, weak_value)
+    for i in range(M):
+        for j in range(N):
+            if image[i, j] > highThreshold:
+                result[i, j] = strong_value
+                strongedge_row[strong_index] = i
+                strongedge_col[strong_index] = j
+                strong_index += 1
+            elif image[i, j] < lowThreshold:
+                result[i, j] = 0
+            else:
+                result[i, j] = weak_value
+                weakedge_row[weak_index] = i
+                weakedge_col[weak_index] = j
+                weak_index += 1
 
-def hysterisis(image, weak_value, strong_value=255):
+    return result, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col
+
+def hysterisis(image, weak_value=50, strong_value=255):
     M, N = image.shape
     # result = np.zeros((M,N))
     top2btm = np.copy(image)
@@ -275,6 +291,26 @@ def hysterisis(image, weak_value, strong_value=255):
     result[result > 255] = 255
     return result
 
+def hysterisis_recusive(image, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col):
+    result = np.copy(image)
+    for i in range(strong_index):
+        result = find_connected_weak_edge(result, strongedge_row[i], strongedge_col[i])
+    
+    for i in range(weak_index):
+        if result[weakedge_row[i], weakedge_col[i]] != 255:
+            result[weakedge_row[i], weakedge_col[i]] = 0
+    
+    return result
+
+def find_connected_weak_edge(image, row, col):
+    M, N = image.shape
+    for i in range(-3, 3, 1):
+        for j in range(-3, 3, 1):
+            if (row+i > 0) and (col+j >0) and (row+i < M) and (col+j < N):
+                image[int(row+i), int(col+j)] = 255
+                image = find_connected_weak_edge(image, row+i, col+j)
+    return image
+
 def fit_parabola(x1, y1, x2, y2, x3, y3):
     # y = ax^2+bx+c
     denom = (x1-x2) * (x1-x3) * (x2-x3)
@@ -312,11 +348,12 @@ def canny(image):
     cv2.imshow('NMS_result', img_nms.astype(np.uint8))
 
     # 4.Double thresholding
-    img_dt, weak_value = double_threshold(img_nms)
+    img_dt, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col = double_threshold(img_nms)
     cv2.imshow('double thresholding', img_dt.astype(np.uint8))
 
     # 5.Edge Tracking by Hysteresis
-    final_result = hysterisis(img_dt, weak_value=weak_value)
+    final_result = hysterisis(img_dt)
+    # final_result = hysterisis_recusive(img_dt, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col)
     cv2.imshow('hysterisis', final_result.astype(np.uint8))
 
     return None
@@ -339,10 +376,11 @@ def read_image(image_name, image_ext):
 
     # CANNY
     canny_image = canny(gray_image)
+    canny_cv =  cv2.Canny(np.uint8(image),200, 300)
 
     cv2.imshow('original', image)
     cv2.imshow('gray', gray_image)
-    # cv2.imshow('canny', canny_image)
+    cv2.imshow('canny', canny_cv)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -367,6 +405,7 @@ def realtime():
             break
 
 if __name__ == '__main__':
+    # sys.setrecursionlimit(10000)
     read_image('lena', 'png')
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
