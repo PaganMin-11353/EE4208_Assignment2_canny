@@ -132,11 +132,12 @@ def sobel_dege_detector(image):
     gradient_direction = np.arctan2(Iy, Ix)
     return gradient_direction, gradient_magnitude, Ix, Iy
 
-def nms(magnitude, dx, dy):
+def nms(magnitude, dx, dy, sub_pixel=False):
     # use sub-pixel interpolation to determine the edge pixel
     mag = np.copy(magnitude)
     M, N = np.shape(mag)
     result = np.zeros((M,N))
+    sub_pixel_location = []
 
     for i in range(1, M-1):
         for j in range(1, N-1):
@@ -190,7 +191,14 @@ def nms(magnitude, dx, dy):
                     result[i,j] = grad
                 else:
                     result[i,j] = 0
-    return result
+                
+                if sub_pixel:
+                    true_x = fit_parabola(x1=,y1=gradTemp1,x2=,y2=grad,x3=,y3=gradTemp2)
+                    sub_pixel_location = np.append(sub_pixel_location, true_x)
+                else:
+                    sub_pixel_location = np.append(sub_pixel_location, 0)
+
+    return result, sub_pixel_location
 
 def double_threshold(image, th_low_ratio = 0.1, th_high_ratio = 0.3):
     # upper lower ratio is recommended to be between 2:1 or 3:1
@@ -216,6 +224,7 @@ def hysterisis(image, weak_value, strong_value=255):
     M, N = image.shape
     # result = np.zeros((M,N))
     top2btm = np.copy(image)
+    btm2top = np.copy(image)
     right2left = np.copy(image)
     left2right = np.copy(image)
 
@@ -230,6 +239,17 @@ def hysterisis(image, weak_value, strong_value=255):
                     top2btm[i,j] = strong_value
                 else:
                     top2btm[i,j] = 0
+
+    for i in range(M-1, 1, -1):
+        for j in range(N-1, 1, -1):
+            # check the 8 surroundings of the weak edge
+            if(btm2top[i,j]==weak_value):
+                if((btm2top[i-1, j-1:j+1] == strong_value).any()
+                     or (btm2top[i, [j-1,j+1]] == strong_value).any()
+                     or (btm2top[i+1, j-1:j+1] == strong_value).any()):
+                    btm2top[i,j] = strong_value
+                else:
+                    btm2top[i,j] = 0
 
     for i in range(1, M):
         for j in range(N-1, 0, -1):
@@ -251,7 +271,7 @@ def hysterisis(image, weak_value, strong_value=255):
                 else:
                     left2right[i,j] = 0
 
-    result = top2btm + right2left + left2right
+    result = top2btm + btm2top + right2left + left2right
     result[result > 255] = 255
     return result
 
@@ -262,7 +282,20 @@ def fit_parabola(x1, y1, x2, y2, x3, y3):
     b = (x3*x3 * (y1-y2) + x2*x2 * (y3-y1) + x1*x1 * (y2-y3)) / denom
     c = (x2 * x3 * (x2-x3) * y1+x3 * x1 * (x3-x1) * y2+x1 * x2 * (x1-x2) * y3) / denom
     x0 = (-1*b)/(2*a)
-    return x0
+    return x0, y2
+
+def sub_pixel(magnitude, nms_result):
+    # based on the edge pixel returned by nms, 
+    # check the magnitude in original gray image
+    # fit in parabola, calculate the x0
+    # resize the location, and display image
+    edge_location = []
+    M, N = nms_result.shape
+    mag = np.copy(magnitude)
+
+    for i in range ():
+        pass
+    return edge_location
 
 def canny(image):
     # 5 steps
@@ -334,7 +367,7 @@ def realtime():
             break
 
 if __name__ == '__main__':
-    read_image('chessboard', 'jpg')
+    read_image('lena', 'png')
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''
