@@ -396,7 +396,7 @@ def canny_subpixel(image):
     canny_result = canny(image, verbose=True)
     accuracy = calculate_accuracy(canny_result, subpixel_result)
     print('the accuracy is: %f' % accuracy)
-    return True
+    return subpixel_result
 
 def calculate_accuracy(canny, subpixel):
     M, N = subpixel.shape
@@ -434,9 +434,9 @@ def read_image(image_name, image_ext, sub_pixel=False):
 
     # CANNY
     if sub_pixel:
-        isDone = canny_subpixel(gray_image)
+        result = canny_subpixel(gray_image)
     else:
-        isDone = canny(gray_image)
+        result = canny(gray_image)
         # canny_cv =  cv2.Canny(np.uint8(image),200, 300)
         # cv2.imshow('canny', canny_cv)
 
@@ -466,8 +466,8 @@ def realtime():
 if __name__ == '__main__':
     # sys.setrecursionlimit(10000)
     # read_image('chessboard_hp', 'jpg', sub_pixel=False)
-    # read_image('chessboard_hp', 'jpg', sub_pixel=True)
-    read_image('lena', 'png', sub_pixel=True)
+    read_image('chessboard_hp', 'jpg', sub_pixel=True)
+    # read_image('lena', 'png', sub_pixel=True)
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''
