@@ -72,20 +72,9 @@ import csv
 #                 image = find_connected_weak_edge(image, row+i, col+j)
 #     return image
 
-def convolution(image, kernel, average=False, verbose=False):
-    if len(image.shape) == 3:
-        print("Found 3 Channels : {}".format(image.shape))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        print("Converted to Gray Channel. Size : {}".format(image.shape))
-    else:
-        print("Image Shape : {}".format(image.shape))
-
+def convolution(image, kernel, average=False):
+    print("Image Shape : {}".format(image.shape))
     print("Kernel Shape : {}".format(kernel.shape))
-
-    if verbose:
-        plt.imshow(image, cmap='gray')
-        plt.title("Image")
-        plt.show()
 
     image_row, image_col = image.shape
     kernel_row, kernel_col = kernel.shape
@@ -95,15 +84,9 @@ def convolution(image, kernel, average=False, verbose=False):
     #padding
     pad_height = int((kernel_row - 1) / 2)
     pad_width = int((kernel_col - 1) / 2)
-
     padded_image = np.zeros((image_row + (2 * pad_height), image_col + (2 * pad_width)))
-
     padded_image[pad_height:padded_image.shape[0] - pad_height, pad_width:padded_image.shape[1] - pad_width] = image
 
-    if verbose:
-        plt.imshow(padded_image, cmap='gray')
-        plt.title("Padded Image")
-        plt.show()
 
     for row in range(image_row):
         for col in range(image_col):
@@ -112,12 +95,6 @@ def convolution(image, kernel, average=False, verbose=False):
                 output[row, col] /= kernel.shape[0] * kernel.shape[1]
 
     print("Output Image size : {}".format(output.shape))
-
-    if verbose:
-        plt.imshow(output, cmap='gray')
-        plt.title("Output Image using {}X{} Kernel".format(kernel_row, kernel_col))
-        plt.show()
-
     return output
 
 def generate_gaussian(size, sigma=1):
@@ -321,43 +298,34 @@ def fit_parabola(x1, y1, x2, y2, x3, y3):
     x0 = (-1*b)/(2*a)
     return x0, y2
 
-# def sub_pixel(magnitude, nms_result):
-#     # based on the edge pixel returned by nms, 
-#     # check the magnitude in original gray image
-#     # fit in parabola, calculate the x0
-#     # resize the location, and display image
-#     edge_location = []
-#     M, N = nms_result.shape
-#     mag = np.copy(magnitude)
-
-#     for i in range ():
-#         pass
-#     return edge_location
-
-def canny(image):
+def canny(image, verbose=True):
     # 5 steps
     # 1.Noise reduction (guassian blur)
     img_gaussian = gaussian_blur(image)
-    cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
+    if verbose:
+        cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
     
     # 2.edge enhancement (gradient caluclation)
     gradient_direction, gradient_magnitude, Ix, Iy = sobel_dege_detector(img_gaussian)
-    cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
+    if verbose:
+        cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
 
     # 3.Non-maximum suppression (pixel accuracy)
     img_nms = nms_interpolation(gradient_magnitude,dx=Ix, dy=Iy)
-    cv2.imshow('NMS_result', img_nms.astype(np.uint8))
+    if verbose:
+        cv2.imshow('NMS_result', img_nms.astype(np.uint8))
 
     # 4.Double thresholding
     img_dt, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col = double_threshold(img_nms)
-    cv2.imshow('double thresholding', img_dt.astype(np.uint8))
+    if verbose:
+        cv2.imshow('double thresholding', img_dt.astype(np.uint8))
 
     # 5.Edge Tracking by Hysteresis
     final_result = hysterisis(img_dt)
     # final_result = hysterisis_recusive(img_dt, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col)
     cv2.imshow('hysterisis', final_result.astype(np.uint8))
 
-    return True
+    return final_result
 
 def compute_edge_points(partial_gradients, min_magnitude=0):
     gx, gy = partial_gradients
@@ -417,15 +385,34 @@ def canny_subpixel(image):
     # 5.get the edge location
 
     # 6.cast again, resize it back to original image
-    result = np.zeros((M,N))
+    subpixel_result = np.zeros((M,N))
     for i in edgels:
-        x = int(i[0]*4)
-        y = int(i[1]*4)
-        result[x,y] = 255
+        y = int(i[0]*4)
+        x = int(i[1]*4)
+        subpixel_result[x,y] = 255
     
-    cv2.imshow('sub_pixel', result)
+    cv2.imshow('sub_pixel', subpixel_result)
 
+    # 7. calculate accuracy
+    canny_result = canny(image, verbose=False)
+    accuracy = calculate_accuracy(canny_result, subpixel_result)
+    print('the accuracy is: %f' % accuracy)
     return True
+
+def calculate_accuracy(canny, subpixel):
+    M, N = subpixel.shape
+    correct = 0
+    incorrect = 0
+    for i in range(M):
+        for j in range(N):
+            if subpixel[i,j] == 255:
+                if (canny[i-3:i+3, j-3:j+3] == 255).any():
+                    correct += 1
+                else:
+                    incorrect += 1
+    
+    accuracy = correct/(correct+incorrect)
+    return accuracy
 
 def read_image(image_name, image_ext, sub_pixel=False):
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -480,8 +467,8 @@ def realtime():
 if __name__ == '__main__':
     # sys.setrecursionlimit(10000)
     # read_image('chessboard_hp', 'jpg', sub_pixel=False)
-    # read_image('chessboard_hp', 'jpg', sub_pixel=True)
-    read_image('lena', 'png', sub_pixel=True)
+    read_image('chessboard_hp', 'jpg', sub_pixel=True)
+    # read_image('lena', 'png', sub_pixel=True)
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''
