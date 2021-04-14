@@ -369,15 +369,15 @@ def canny_subpixel(image):
     # 1.resize
     M, N = image.shape
     img_resize = cv2.resize(image, (int(N/4), int(M/4)), interpolation=cv2.INTER_AREA)
-    cv2.imshow('gaussian_blur',img_resize.astype(np.uint8))
+    cv2.imshow('resized_image',img_resize.astype(np.uint8))
 
     # 2.Noise reduction (guassian blur)
     img_gaussian = gaussian_blur(img_resize)
-    cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
+    cv2.imshow('gaussian_blur_resized',img_gaussian.astype(np.uint8))
     
     # 3.edge enhancement (gradient caluclation)
     gradient_direction, gradient_magnitude, Ix, Iy = sobel_dege_detector(img_gaussian)
-    cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
+    cv2.imshow('edge enhancement_resized',gradient_magnitude.astype(np.uint8))
 
     # 4.sub pixel canny
     edgels = compute_edge_points((Ix, Iy),50)
@@ -390,11 +390,10 @@ def canny_subpixel(image):
         y = int(i[0]*4)
         x = int(i[1]*4)
         subpixel_result[x,y] = 255
-    
     cv2.imshow('sub_pixel', subpixel_result)
 
     # 7. calculate accuracy
-    canny_result = canny(image, verbose=False)
+    canny_result = canny(image, verbose=True)
     accuracy = calculate_accuracy(canny_result, subpixel_result)
     print('the accuracy is: %f' % accuracy)
     return True
