@@ -466,8 +466,8 @@ def realtime():
 if __name__ == '__main__':
     # sys.setrecursionlimit(10000)
     # read_image('chessboard_hp', 'jpg', sub_pixel=False)
-    read_image('chessboard_hp', 'jpg', sub_pixel=True)
-    # read_image('lena', 'png', sub_pixel=True)
+    # read_image('chessboard_hp', 'jpg', sub_pixel=True)
+    read_image('lena', 'png', sub_pixel=True)
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''

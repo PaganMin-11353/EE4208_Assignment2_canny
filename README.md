@@ -3,6 +3,7 @@ Thanks to:
 ## English site:  
 ### Canny with Sub-pixel acurracy (Canny/Devernay Algorithm):  
 <http://www.ipol.im/pub/art/2017/216/?utm_source=doi>  
+<https://github.com/mostlyuseful/devernaysubpix>  
 ### Canny:  
 <http://www.adeveloperdiary.com/data-science/computer-vision/implement-canny-edge-detector-using-python-from-scratch/>  
 <https://docs.opencv.org/3.1.0/da/d22/tutorial_py_canny.html>  
