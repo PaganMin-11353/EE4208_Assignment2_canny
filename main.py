@@ -4,52 +4,73 @@ import cv2
 from time import time
 import numpy as np
 import os
+import sys
 import matplotlib.pyplot as plt
 from numpy.lib.function_base import gradient
-import sys
+import csv
 
 
-def convolve2D(image, kernel, padding=2, strides=1):
-    # Cross Correlation, turn the kernel by 180 degrees
-    kernel = np.flipud(np.fliplr(kernel))
+# def convolve2D(image, kernel, padding=2, strides=1):
+#     # Cross Correlation, turn the kernel by 180 degrees
+#     kernel = np.flipud(np.fliplr(kernel))
 
-    # Gather Shapes of Kernel + Image + Padding
-    xKernShape = kernel.shape[0]
-    yKernShape = kernel.shape[1]
-    xImgShape = image.shape[0]
-    yImgShape = image.shape[1]
+#     # Gather Shapes of Kernel + Image + Padding
+#     xKernShape = kernel.shape[0]
+#     yKernShape = kernel.shape[1]
+#     xImgShape = image.shape[0]
+#     yImgShape = image.shape[1]
 
-    # Shape of Output Convolution
-    xOutput = int(((xImgShape - xKernShape + 2 * padding) / strides) + 1)
-    yOutput = int(((yImgShape - yKernShape + 2 * padding) / strides) + 1)
-    output = np.zeros((xOutput, yOutput))
+#     # Shape of Output Convolution
+#     xOutput = int(((xImgShape - xKernShape + 2 * padding) / strides) + 1)
+#     yOutput = int(((yImgShape - yKernShape + 2 * padding) / strides) + 1)
+#     output = np.zeros((xOutput, yOutput))
 
-    # Apply Equal Padding to All Sides
-    if padding != 0:
-        imagePadded = np.zeros((image.shape[0] + padding*2, image.shape[1] + padding*2))
-        imagePadded[int(padding):int(-1 * padding), int(padding):int(-1 * padding)] = image
-        # print(imagePadded)
-    else:
-        imagePadded = image
+#     # Apply Equal Padding to All Sides
+#     if padding != 0:
+#         imagePadded = np.zeros((image.shape[0] + padding*2, image.shape[1] + padding*2))
+#         imagePadded[int(padding):int(-1 * padding), int(padding):int(-1 * padding)] = image
+#         # print(imagePadded)
+#     else:
+#         imagePadded = image
 
-    # Iterate through image
-    for y in range(yImgShape):
-        # Exit Convolution
-        if y > yImgShape - yKernShape:
-            break
-        # Only Convolve if y has gone down by the specified Strides
-        if y % strides == 0:
-            for x in range(xImgShape):
-                # Go to next row once kernel is out of bounds
-                if x > xImgShape - xKernShape:
-                    break
-                try:
-                    # Only Convolve if x has moved by the specified Strides
-                    if x % strides == 0:
-                        output[x, y] = (kernel * imagePadded[x: x + xKernShape, y: y + yKernShape]).sum()
-                except:
-                    break
-    return output
+#     # Iterate through image
+#     for y in range(yImgShape):
+#         # Exit Convolution
+#         if y > yImgShape - yKernShape:
+#             break
+#         # Only Convolve if y has gone down by the specified Strides
+#         if y % strides == 0:
+#             for x in range(xImgShape):
+#                 # Go to next row once kernel is out of bounds
+#                 if x > xImgShape - xKernShape:
+#                     break
+#                 try:
+#                     # Only Convolve if x has moved by the specified Strides
+#                     if x % strides == 0:
+#                         output[x, y] = (kernel * imagePadded[x: x + xKernShape, y: y + yKernShape]).sum()
+#                 except:
+#                     break
+#     return output
+
+# def hysterisis_recusive(image, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col):
+#     result = np.copy(image)
+#     for i in range(strong_index):
+#         result = find_connected_weak_edge(result, strongedge_row[i], strongedge_col[i])
+    
+#     for i in range(weak_index):
+#         if result[weakedge_row[i], weakedge_col[i]] != 255:
+#             result[weakedge_row[i], weakedge_col[i]] = 0
+    
+#     return result
+
+# def find_connected_weak_edge(image, row, col):
+#     M, N = image.shape
+#     for i in range(-3, 3, 1):
+#         for j in range(-3, 3, 1):
+#             if (row+i > 0) and (col+j >0) and (row+i < M) and (col+j < N):
+#                 image[int(row+i), int(col+j)] = 255
+#                 image = find_connected_weak_edge(image, row+i, col+j)
+#     return image
 
 def convolution(image, kernel, average=False, verbose=False):
     if len(image.shape) == 3:
@@ -133,7 +154,7 @@ def sobel_dege_detector(image):
     gradient_direction = np.arctan2(Iy, Ix)
     return gradient_direction, gradient_magnitude, Ix, Iy
 
-def nms(magnitude, dx, dy, sub_pixel=False):
+def nms_interpolation(magnitude, dx, dy, sub_pixel=False):
     # use sub-pixel interpolation to determine the edge pixel
     mag = np.copy(magnitude)
     M, N = np.shape(mag)
@@ -291,26 +312,6 @@ def hysterisis(image, weak_value=50, strong_value=255):
     result[result > 255] = 255
     return result
 
-def hysterisis_recusive(image, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col):
-    result = np.copy(image)
-    for i in range(strong_index):
-        result = find_connected_weak_edge(result, strongedge_row[i], strongedge_col[i])
-    
-    for i in range(weak_index):
-        if result[weakedge_row[i], weakedge_col[i]] != 255:
-            result[weakedge_row[i], weakedge_col[i]] = 0
-    
-    return result
-
-def find_connected_weak_edge(image, row, col):
-    M, N = image.shape
-    for i in range(-3, 3, 1):
-        for j in range(-3, 3, 1):
-            if (row+i > 0) and (col+j >0) and (row+i < M) and (col+j < N):
-                image[int(row+i), int(col+j)] = 255
-                image = find_connected_weak_edge(image, row+i, col+j)
-    return image
-
 def fit_parabola(x1, y1, x2, y2, x3, y3):
     # y = ax^2+bx+c
     denom = (x1-x2) * (x1-x3) * (x2-x3)
@@ -320,18 +321,18 @@ def fit_parabola(x1, y1, x2, y2, x3, y3):
     x0 = (-1*b)/(2*a)
     return x0, y2
 
-def sub_pixel(magnitude, nms_result):
-    # based on the edge pixel returned by nms, 
-    # check the magnitude in original gray image
-    # fit in parabola, calculate the x0
-    # resize the location, and display image
-    edge_location = []
-    M, N = nms_result.shape
-    mag = np.copy(magnitude)
+# def sub_pixel(magnitude, nms_result):
+#     # based on the edge pixel returned by nms, 
+#     # check the magnitude in original gray image
+#     # fit in parabola, calculate the x0
+#     # resize the location, and display image
+#     edge_location = []
+#     M, N = nms_result.shape
+#     mag = np.copy(magnitude)
 
-    for i in range ():
-        pass
-    return edge_location
+#     for i in range ():
+#         pass
+#     return edge_location
 
 def canny(image):
     # 5 steps
@@ -344,7 +345,7 @@ def canny(image):
     cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
 
     # 3.Non-maximum suppression (pixel accuracy)
-    img_nms = nms(gradient_magnitude,dx=Ix, dy=Iy)
+    img_nms = nms_interpolation(gradient_magnitude,dx=Ix, dy=Iy)
     cv2.imshow('NMS_result', img_nms.astype(np.uint8))
 
     # 4.Double thresholding
@@ -356,16 +357,87 @@ def canny(image):
     # final_result = hysterisis_recusive(img_dt, weak_index, weakedge_row, weakedge_col, strong_index, strongedge_row, strongedge_col)
     cv2.imshow('hysterisis', final_result.astype(np.uint8))
 
-    return None
+    return True
 
-def read_image(image_name, image_ext):
+def compute_edge_points(partial_gradients, min_magnitude=0):
+    gx, gy = partial_gradients
+    rows, cols = gx.shape
+    edges = []
+
+    def mag(y, x):
+        # sqrt(x^2+y^2) magnitude
+        return np.hypot(gx[y, x], gy[y, x])
+
+    for y in range(1, rows - 1):
+        for x in range(1, cols - 1):
+
+            center_mag = mag(y, x)
+            if center_mag < min_magnitude:
+                continue
+
+            left_mag = mag(y, x - 1)
+            right_mag = mag(y, x + 1)
+            top_mag = mag(y - 1, x)
+            bottom_mag = mag(y + 1, x)
+
+            theta_x, theta_y = 0, 0
+            if (left_mag < center_mag >= right_mag) and abs(gx[y, x]) >= abs(gy[y, x]):
+                theta_x = 1
+            elif (top_mag < center_mag >= bottom_mag) and abs(gx[y, x]) <= abs(gy[y, x]):
+                theta_y = 1
+
+            if theta_x != 0 or theta_y != 0:
+                a = mag(y - theta_y, x - theta_x)
+                b = mag(y, x)
+                c = mag(y + theta_y, x + theta_x)
+                lamda = (a - c) / (2 * (a - 2 * b + c))
+                ex = x + lamda * theta_x
+                ey = y + lamda * theta_y
+                edges.append([ex, ey])
+                print('(%f, %f)' % (ex, ey))
+    return edges
+
+def canny_subpixel(image):
+    # 1.resize
+    M, N = image.shape
+    img_resize = cv2.resize(image, (int(N/4), int(M/4)), interpolation=cv2.INTER_AREA)
+    cv2.imshow('gaussian_blur',img_resize.astype(np.uint8))
+
+    # 2.Noise reduction (guassian blur)
+    img_gaussian = gaussian_blur(img_resize)
+    cv2.imshow('gaussian_blur',img_gaussian.astype(np.uint8))
+    
+    # 3.edge enhancement (gradient caluclation)
+    gradient_direction, gradient_magnitude, Ix, Iy = sobel_dege_detector(img_gaussian)
+    cv2.imshow('edge enhancement',gradient_magnitude.astype(np.uint8))
+
+    # 4.sub pixel canny
+    edgels = compute_edge_points((Ix, Iy),50)
+    
+    # 5.get the edge location
+
+    # 6.cast again, resize it back to original image
+    result = np.zeros((M,N))
+    for i in edgels:
+        x = int(i[0]*4)
+        y = int(i[1]*4)
+        result[x,y] = 255
+    
+    cv2.imshow('sub_pixel', result)
+
+    return True
+
+def read_image(image_name, image_ext, sub_pixel=False):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     image_path = os.path.join(base_dir, image_name + '.' + image_ext)
     image = cv2.imread(image_path)
+    cv2.imshow('original', image)
+
     if len(image.shape) == 3:
         gray_image = RGB2GRAY(image)
     elif len(image.shape) == 2:
         gray_image = image
+    cv2.imshow('gray', gray_image)
 
     # # normalize the grayimage to 0.0 to 1.0 for display
     # gray_image /= 255. 
@@ -375,12 +447,13 @@ def read_image(image_name, image_ext):
     # print(gray_image) 
 
     # CANNY
-    canny_image = canny(gray_image)
-    canny_cv =  cv2.Canny(np.uint8(image),200, 300)
+    if sub_pixel:
+        isDone = canny_subpixel(gray_image)
+    else:
+        isDone = canny(gray_image)
+        # canny_cv =  cv2.Canny(np.uint8(image),200, 300)
+        # cv2.imshow('canny', canny_cv)
 
-    cv2.imshow('original', image)
-    cv2.imshow('gray', gray_image)
-    cv2.imshow('canny', canny_cv)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -406,7 +479,9 @@ def realtime():
 
 if __name__ == '__main__':
     # sys.setrecursionlimit(10000)
-    read_image('lena', 'png')
+    # read_image('chessboard_hp', 'jpg', sub_pixel=False)
+    # read_image('chessboard_hp', 'jpg', sub_pixel=True)
+    read_image('lena', 'png', sub_pixel=True)
     # print(generate_gaussian(5))
     # gaussian separable. use 1D filter to reduce calculation time
     # print(cv2.getGaussianKernel(ksize=5,sigma=1) * cv2.getGaussianKernel(ksize=5,sigma=1).T)''
