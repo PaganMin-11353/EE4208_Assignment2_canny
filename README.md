@@ -1,5 +1,7 @@
-# EE4208_proj2
-Thanks to:  
+# EE4208_assignment2_canny_subpixel  
+Home Assignment  
+  
+References:  
 ## English site:  
 ### Canny with Sub-pixel acurracy (Canny/Devernay Algorithm):  
 <http://www.ipol.im/pub/art/2017/216/?utm_source=doi>  
